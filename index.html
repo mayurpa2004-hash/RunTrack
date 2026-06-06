@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>RunTrack</title>
+  
+  <!-- PWA Manifest & Theme -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAQAAAD1s+mNAAAAMElEQVR42u3PgQAAAAAMKsP+p11jBwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIB3BgxgAAEAH5LCAAAAAElFTkSuQmCC">
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { padding: { 'safe': 'env(safe-area-inset-bottom)' } } }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Smooth transitions and mobile optimization */
+    body { -webkit-tap-highlight-color: transparent; }
+    .screen { display: none; flex-direction: column; height: 100%; }
+    .screen.active { display: flex; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .feeling-btn { transition: all 0.2s ease; opacity: 0.6; filter: grayscale(100%); }
+    .feeling-btn.selected { opacity: 1; filter: grayscale(0%); transform: scale(1.1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-color: #3b82f6; }
+  </style>
+</head>
+<body class="bg-gray-200 dark:bg-black flex justify-center font-sans selection:bg-blue-200 selection:text-blue-900 transition-colors duration-300">
+  
+  <!-- Mobile App Container -->
+  <div class="w-full max-w-md h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white flex flex-col shadow-2xl overflow-hidden relative transition-colors duration-300">
+    
+    <!-- MAIN CONTENT AREA -->
+    <main id="main-content" class="flex-1 overflow-y-auto scrollbar-hide pb-24">
+      
+      <!-- LOADING SCREEN -->
+      <div id="screen-loading" class="screen active justify-center items-center h-full">
+        <i data-lucide="loader-2" class="animate-spin text-blue-600 w-10 h-10"></i>
+      </div>
+
+      <!-- ONBOARDING SCREEN -->
+      <div id="screen-onboarding" class="screen p-6 min-h-full justify-center">
+        <div class="text-center mb-10 mt-10">
+          <div class="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i data-lucide="activity" class="w-10 h-10"></i>
+          </div>
+          <h1 class="text-3xl font-black mb-2">Welcome to RunTrack</h1>
+          <p class="text-gray-500 dark:text-gray-400">Discipline equals freedom. Let's set your baseline.</p>
+        </div>
+        <form id="onboarding-form" class="space-y-4">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Your Name</label>
+            <input id="onboard-name" type="text" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Mayur" required>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mb-4">
+            <div>
+              <label class="block text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Weight (kg)</label>
+              <input id="onboard-weight" type="number" class="w-full px-3 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="70" min="30" max="200" required>
+            </div>
+            <div>
+              <label class="block text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Height (cm)</label>
+              <input id="onboard-height" type="number" class="w-full px-3 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="170" min="100" max="250" required>
+            </div>
+            <div>
+              <label class="block text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Goal (km/w)</label>
+              <input id="onboard-goal" type="number" class="w-full px-3 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="15" min="1" required>
+            </div>
+          </div>
+          <div class="pt-6">
+            <button type="submit" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-lg shadow-blue-200 dark:shadow-blue-900/20">
+              Establish Baseline <i data-lucide="chevron-right" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- HOME SCREEN -->
+      <div id="screen-home" class="screen p-4 space-y-6">
+        <header class="flex justify-between items-center pt-2">
+          <div>
+            <h2 class="text-sm text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Dashboard</h2>
+            <h1 id="home-greeting" class="text-2xl font-black">Let's grind</h1>
+          </div>
+          <div id="home-streak" class="flex items-center gap-1 text-orange-500 font-bold bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-full shadow-sm">
+            <i data-lucide="flame" class="w-4 h-4"></i> <span id="streak-count">0</span> Day
+          </div>
+        </header>
+
+        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <h3 class="font-black mb-4 flex items-center gap-2"><i data-lucide="target" class="text-blue-500 w-5 h-5"></i> Goal Tracker</h3>
+          <div id="home-goals-container"></div>
+        </div>
+
+        <div id="last-run-card" class="hidden bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer transition-transform active:scale-[0.98]" onclick="app.navigate('history')">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                <i data-lucide="activity" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider mb-0.5">Last Run <span id="last-run-date" class="font-normal lowercase ml-1"></span></p>
+                <p class="font-black text-lg text-gray-900 dark:text-white"><span id="last-run-dist">0.00</span> km</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-sm font-bold text-gray-700 dark:text-gray-300" id="last-run-duration">00:00</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-3">
+          <button onclick="app.startRun(false)" class="w-full py-4 bg-blue-600 text-white text-lg rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-[0_10px_20px_-10px_rgba(37,99,235,0.6)]">
+            <i data-lucide="play" class="w-6 h-6 fill-current"></i> Start Real GPS Run
+          </button>
+          <button onclick="app.startRun(true)" class="w-full py-3 bg-transparent text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 text-sm rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95 transition-transform">
+            <i data-lucide="navigation" class="w-4 h-4"></i> Simulate Run (Test Milestones)
+          </button>
+        </div>
+      </div>
+
+      <!-- ACTIVE RUN SCREEN -->
+      <div id="screen-run" class="screen flex-col bg-gray-900 text-white p-6 justify-between h-screen -mx-0 fixed top-0 left-0 w-full max-w-md z-50 overflow-hidden">
+        <header class="flex justify-between items-center pt-4">
+          <button onclick="app.cancelRun()" class="p-2 text-gray-400 hover:text-white"><i data-lucide="chevron-left" class="w-7 h-7"></i></button>
+          <div class="flex flex-col items-center">
+            <span id="run-status-badge" class="font-bold tracking-widest text-xs text-blue-400 flex items-center gap-2 mb-1">
+              <i data-lucide="activity" class="animate-pulse w-3 h-3"></i> ACQUIRING GPS
+            </span>
+            <span id="gps-indicator" class="text-[10px] font-bold text-gray-500 uppercase"></span>
+          </div>
+          <div class="w-10 text-right" id="run-voice-icon">
+            <i data-lucide="volume-2" class="text-gray-500 w-5 h-5 inline-block"></i>
+          </div>
+        </header>
+
+        <div id="run-error-container" class="hidden text-center text-red-400 bg-red-900/20 p-4 rounded-xl border border-red-900/50 mt-10">
+          <i data-lucide="alert-triangle" class="mx-auto mb-2 w-8 h-8"></i>
+          <p id="run-error-msg" class="text-sm">Error</p>
+          <button id="run-error-action" class="mt-3 px-4 py-2 bg-red-800/50 rounded-lg text-xs font-bold text-white hidden">Action</button>
+        </div>
+
+        <div id="run-metrics-container" class="flex-1 flex flex-col justify-center items-center">
+          <p class="text-gray-400 font-medium mb-1 tracking-widest text-sm">DISTANCE</p>
+          <h2 class="text-7xl font-black tabular-nums tracking-tighter mb-12">
+            <span id="run-dist">0.00</span> <span class="text-2xl text-gray-500 font-bold tracking-normal">km</span>
+          </h2>
+          <div class="grid grid-cols-2 gap-x-12 gap-y-8 text-center w-full max-w-xs">
+            <div><p class="text-gray-500 text-xs font-bold tracking-widest mb-1">TIME</p><p id="run-time" class="text-3xl font-bold tabular-nums">00:00</p></div>
+            <div><p class="text-gray-500 text-xs font-bold tracking-widest mb-1">PACE</p><p id="run-pace" class="text-3xl font-bold tabular-nums">--:--</p></div>
+          </div>
+        </div>
+
+        <div class="flex justify-center items-center gap-6 pb-8 h-32" id="run-controls">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- RUN SUMMARY SCREEN -->
+      <div id="screen-run-summary" class="screen p-4 space-y-4">
+        <div class="text-center mt-6 mb-2">
+          <h1 class="text-2xl font-black">Run Completed</h1>
+          <p id="summary-date" class="text-gray-500 dark:text-gray-400 font-medium text-sm"></p>
+        </div>
+        
+        <div id="map-container" class="h-48 mb-2 shadow-md rounded-2xl z-0 overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"></div>
+
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md flex flex-col justify-center">
+          <div class="text-center border-b border-gray-100 dark:border-gray-700 pb-3 mb-3">
+            <p class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Distance</p>
+            <p class="text-5xl font-black text-blue-600 dark:text-blue-400"><span id="summary-dist">0.00</span><span class="text-xl text-blue-400 font-bold ml-1">km</span></p>
+          </div>
+          <div class="grid grid-cols-2 gap-y-3">
+            <div class="text-center"><p class="text-gray-400 text-[10px] font-bold uppercase mb-1">Time</p><p id="summary-time" class="text-lg font-bold">00:00</p></div>
+            <div class="text-center border-l border-gray-100 dark:border-gray-700"><p class="text-gray-400 text-[10px] font-bold uppercase mb-1">Avg Pace</p><p id="summary-pace" class="text-lg font-bold">--:--</p></div>
+            <div class="text-center"><p class="text-gray-400 text-[10px] font-bold uppercase mb-1">Calories</p><p id="summary-cal" class="text-lg font-bold">0</p></div>
+            <div class="text-center border-l border-gray-100 dark:border-gray-700"><p class="text-gray-400 text-[10px] font-bold uppercase mb-1">Est. Steps</p><p id="summary-steps" class="text-lg font-bold">0</p></div>
+          </div>
+        </div>
+
+        <!-- Feeling Selector -->
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md text-center">
+          <p class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">How did it feel?</p>
+          <div class="flex justify-center gap-3">
+            <button onclick="app.setFeeling('easy')" id="feel-easy" class="feeling-btn flex-1 py-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-xl border border-transparent font-bold flex flex-col items-center">
+              <span class="text-2xl mb-1">😀</span> Easy
+            </button>
+            <button onclick="app.setFeeling('normal')" id="feel-normal" class="feeling-btn selected flex-1 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border-blue-400 font-bold flex flex-col items-center">
+              <span class="text-2xl mb-1">😐</span> Normal
+            </button>
+            <button onclick="app.setFeeling('hard')" id="feel-hard" class="feeling-btn flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-xl border border-transparent font-bold flex flex-col items-center">
+              <span class="text-2xl mb-1">😫</span> Hard
+            </button>
+          </div>
+        </div>
+
+        <button onclick="app.saveCompletedRun()" class="w-full py-4 bg-blue-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-lg shadow-blue-200 dark:shadow-blue-900/20 text-lg">
+          Save Activity
+        </button>
+      </div>
+
+      <!-- RUN DETAILS SCREEN (NEW) -->
+      <div id="screen-run-details" class="screen p-4 space-y-4">
+        <header class="flex items-center pt-2 mb-2">
+          <button onclick="app.navigate('history')" class="p-2 -ml-2 text-gray-500 hover:text-gray-800 dark:hover:text-white"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+          <div class="flex-1 text-center pr-6">
+            <h1 class="text-xl font-black">Run Details</h1>
+            <p id="details-date" class="text-gray-500 dark:text-gray-400 text-xs font-medium"></p>
+          </div>
+        </header>
+
+        <div id="details-map-container" class="h-56 shadow-md rounded-2xl z-0 overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"></div>
+
+        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-md flex flex-col justify-center">
+          <div class="text-center border-b border-gray-100 dark:border-gray-700 pb-4 mb-4">
+            <p class="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Distance</p>
+            <p class="text-5xl font-black text-blue-600 dark:text-blue-400"><span id="details-dist">0.00</span><span class="text-xl text-blue-400 font-bold ml-1">km</span></p>
+          </div>
+          <div class="grid grid-cols-2 gap-y-4">
+            <div class="text-center"><p class="text-gray-400 text-[10px] font-bold uppercase mb-1">Time</p><p id="details-time" class="text-lg font-bold">00:00</p></div>
+            <div class="text-center border-l border-gray-100 dark:border-gray-700"><p class="text-gray-400 text-[10px] font-bold uppercase mb-1">Avg Pace</p><p id="details-pace" class="text-lg font-bold">--:--</p></div>
+            <div class="text-center"><p class="text-gray-400 text-[10px] font-bold uppercase mb-1">Calories</p><p id="details-cal" class="text-lg font-bold">0</p></div>
+            <div class="text-center border-l border-gray-100 dark:border-gray-700"><p class="text-gray-400 text-[10px] font-bold uppercase mb-1">Est. Steps</p><p id="details-steps" class="text-lg font-bold">0</p></div>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-md flex justify-between items-center">
+          <span class="font-bold text-gray-700 dark:text-gray-300">Run Feeling</span>
+          <span id="details-feeling" class="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg font-medium text-sm"></span>
+        </div>
+      </div>
+
+      <!-- HISTORY SCREEN -->
+      <div id="screen-history" class="screen p-4 space-y-4">
+        <h2 class="text-2xl font-black mb-6 mt-2">Training Log</h2>
+        <div id="history-list" class="space-y-3 pb-8"></div>
+      </div>
+
+      <!-- ANALYTICS SCREEN -->
+      <div id="screen-analytics" class="screen p-4 space-y-6">
+        <h2 class="text-2xl font-black mb-2 mt-2">Analytics</h2>
+        
+        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <h3 class="font-bold flex items-center gap-2 border-b dark:border-gray-700 pb-2 mb-6"><i data-lucide="bar-chart-3" class="text-blue-500 w-5 h-5"></i> 7-Day Distance Trend</h3>
+          <div id="chart-7day" class="h-40 flex items-end justify-between gap-2 px-2"></div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <h3 class="font-bold flex items-center gap-2 border-b dark:border-gray-700 pb-2 mb-4"><i data-lucide="trending-up" class="text-green-500 w-5 h-5"></i> Pace History (Last 5)</h3>
+          <div id="chart-pace" class="space-y-4 pt-2"></div>
+        </div>
+      </div>
+
+      <!-- PROFILE SCREEN -->
+      <div id="screen-profile" class="screen p-4 space-y-6">
+        <h2 class="text-2xl font-black mb-2 mt-2">Athlete Profile</h2>
+        
+        <div class="grid grid-cols-2 gap-3 mb-2">
+          <div class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-4 text-white shadow-lg">
+            <i data-lucide="trending-up" class="mb-2 text-blue-200 w-6 h-6"></i>
+            <p id="prof-totalkm" class="text-3xl font-black">0.0</p>
+            <p class="text-xs font-medium text-blue-200 uppercase tracking-wider mt-1">Total Km</p>
+          </div>
+          <div class="bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl p-4 text-white shadow-lg">
+            <i data-lucide="trophy" class="mb-2 text-orange-200 w-6 h-6"></i>
+            <p id="prof-streak" class="text-3xl font-black">0</p>
+            <p class="text-xs font-medium text-orange-200 uppercase tracking-wider mt-1">Max Streak</p>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <h3 class="font-bold border-b dark:border-gray-700 pb-2 mb-4 flex items-center gap-2"><i data-lucide="zap" class="text-yellow-500 w-5 h-5"></i> Personal Records</h3>
+          <div class="flex justify-between py-2 border-b border-gray-50 dark:border-gray-700"><span class="text-gray-500 dark:text-gray-400">Longest Run</span><span id="prof-pr-dist" class="font-bold">0 km</span></div>
+          <div class="flex justify-between py-2 border-b border-gray-50 dark:border-gray-700"><span class="text-gray-500 dark:text-gray-400">Fastest Pace</span><span id="prof-pr-pace" class="font-bold">--:--</span></div>
+          <div class="flex justify-between py-2"><span class="text-gray-500 dark:text-gray-400">Total Runs</span><span id="prof-totalruns" class="font-bold">0</span></div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <h3 class="font-bold border-b dark:border-gray-700 pb-2 mb-4 flex items-center gap-2"><i data-lucide="settings" class="w-5 h-5"></i> Settings & Goals</h3>
+          
+          <div class="grid grid-cols-3 gap-3 mb-4">
+            <div>
+              <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Weight (kg)</label>
+              <input id="prof-input-weight" type="number" class="w-full px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent text-sm">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Height (cm)</label>
+              <input id="prof-input-height" type="number" class="w-full px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent text-sm">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Goal (km)</label>
+              <input id="prof-input-goal" type="number" class="w-full px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent text-sm">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between py-3 border-b border-gray-50 dark:border-gray-700 mb-2">
+            <div>
+              <p class="font-medium text-sm">Voice Coach Interval</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Continuous milestone speech</p>
+            </div>
+            <select id="prof-input-voice" class="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
+              <option value="0">Off</option>
+              <option value="0.5">Every 500m</option>
+              <option value="1">Every 1km</option>
+              <option value="2">Every 2km</option>
+            </select>
+          </div>
+          
+          <div class="flex justify-between py-3 mb-2">
+            <div>
+              <p class="font-medium text-sm">Dark Mode</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Toggle dark appearance</p>
+            </div>
+            <button id="toggle-theme" onclick="app.toggleTheme()" class="w-12 h-6 rounded-full relative transition-colors bg-gray-300 dark:bg-gray-600">
+              <div id="toggle-theme-dot" class="w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform translate-x-0.5"></div>
+            </button>
+          </div>
+          <button onclick="app.saveProfileSettings()" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold flex justify-center items-center mt-2 active:scale-95 transition-transform shadow-lg shadow-blue-200 dark:shadow-blue-900/20">
+            Save Updates
+          </button>
+        </div>
+
+        <button onclick="app.exportData()" class="w-full py-3 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 rounded-xl font-bold flex justify-center items-center gap-2 mt-4 active:scale-95 transition-transform shadow-sm">
+          <i data-lucide="download" class="w-5 h-5"></i> Export My Data (JSON)
+        </button>
+        
+        <button onclick="app.resetAllData()" class="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-xl font-bold flex justify-center items-center gap-2 mt-4 active:scale-95 transition-transform shadow-sm mb-6">
+          <i data-lucide="trash-2" class="w-5 h-5"></i> Reset All Data
+        </button>
+
+      </div>
+
+    </main>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav id="bottom-nav" class="hidden absolute bottom-0 w-full bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 pb-safe pt-2 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.1)] z-40 transition-colors duration-300">
+      <div class="flex justify-around items-center px-2 pb-2">
+        <button onclick="app.navigate('home')" id="nav-home" class="nav-btn flex flex-col items-center p-2 w-full transition-all duration-200 text-gray-400 hover:text-gray-600">
+          <i data-lucide="activity" class="w-6 h-6"></i><span class="text-[10px] font-bold mt-1 uppercase tracking-wider">Run</span>
+        </button>
+        <button onclick="app.navigate('history')" id="nav-history" class="nav-btn flex flex-col items-center p-2 w-full transition-all duration-200 text-gray-400 hover:text-gray-600">
+          <i data-lucide="clock" class="w-6 h-6"></i><span class="text-[10px] font-bold mt-1 uppercase tracking-wider">History</span>
+        </button>
+        <button onclick="app.navigate('analytics')" id="nav-analytics" class="nav-btn flex flex-col items-center p-2 w-full transition-all duration-200 text-gray-400 hover:text-gray-600">
+          <i data-lucide="bar-chart-3" class="w-6 h-6"></i><span class="text-[10px] font-bold mt-1 uppercase tracking-wider">Stats</span>
+        </button>
+        <button onclick="app.navigate('profile')" id="nav-profile" class="nav-btn flex flex-col items-center p-2 w-full transition-all duration-200 text-gray-400 hover:text-gray-600">
+          <i data-lucide="user" class="w-6 h-6"></i><span class="text-[10px] font-bold mt-1 uppercase tracking-wider">Profile</span>
+        </button>
+      </div>
+    </nav>
+
+  </div>
+
+  <script>
+    // ==========================================
+    // PWA REGISTRATION
+    // ==========================================
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration Failed:', err));
+      });
+    }
+
+    // ==========================================
+    // GLOBAL STATE & UTILS
+    // ==========================================
+    const state = {
+      profile: null,
+      runs: [],
+      currentScreen: 'loading',
+      tempRun: null,
+      wakeLock: null,
+      
+      runData: {
+        isSimulated: false,
+        status: 'acquiring', // acquiring, running, paused
+        sec: 0,
+        dist: 0,
+        route: [],
+        intervalId: null,
+        watchId: null,
+        lastValidPoint: null,
+        lastAnnouncedDist: 0,
+        goalAnnounced: false
+      },
+      
+      leafletMaps: { summary: null, details: null }
+    };
+
+    const $ = id => document.getElementById(id);
+
+    // Math Utils
+    const calcDist = (lat1, lon1, lat2, lon2) => {
+      const R = 6371; const dLat = (lat2 - lat1) * (Math.PI / 180); const dLon = (lon2 - lon1) * (Math.PI / 180);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    };
+    const formatTime = (totalSec) => {
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0');
+      const s = (totalSec % 60).toString().padStart(2, '0');
+      return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+    };
+    const formatPace = (secPerKm) => {
+      if (!secPerKm || !isFinite(secPerKm) || secPerKm === 0) return "--:--";
+      const m = Math.floor(secPerKm / 60).toString().padStart(2, '0');
+      const s = Math.floor(secPerKm % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    };
+    const formatPaceSpeech = (secPerKm) => {
+      if (!secPerKm || !isFinite(secPerKm) || secPerKm === 0) return "";
+      const m = Math.floor(secPerKm / 60);
+      const s = Math.floor(secPerKm % 60);
+      return `${m} minutes and ${s} seconds`;
+    };
+
+    // Voice Coach
+    const speak = (text) => {
+      if (!state.profile?.settings?.voiceCoachInterval || !window.speechSynthesis) return;
+      if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.05; u.pitch = 1.0;
+      window.speechSynthesis.speak(u);
+    };
+
+    // ==========================================
+    // DATABASE LAYER (IndexedDB)
+    // ==========================================
+    const dbUtil = {
+      init: () => new Promise((resolve, reject) => {
+        const req = indexedDB.open('RunTrackDB', 4); // Bumped version for backward compatibility safety
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => resolve(req.result);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('profile')) db.createObjectStore('profile', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('runs')) db.createObjectStore('runs', { keyPath: 'id' }); // Changed to use explicit id (timestamp)
+        };
+      }),
+      get: async (store, id) => {
+        try {
+          const db = await dbUtil.init();
+          return new Promise((res, rej) => {
+            const req = db.transaction(store, 'readonly').objectStore(store).get(id);
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          });
+        } catch (e) { console.error("IDB Get Error:", e); return null; }
+      },
+      put: async (store, item) => {
+        try {
+          const db = await dbUtil.init();
+          return new Promise((res, rej) => {
+            const req = db.transaction(store, 'readwrite').objectStore(store).put(item);
+            req.onsuccess = () => res();
+            req.onerror = () => rej(req.error);
+          });
+        } catch (e) { console.error("IDB Put Error:", e); }
+      },
+      getAll: async (store) => {
+        try {
+          const db = await dbUtil.init();
+          return new Promise((res, rej) => {
+            const req = db.transaction(store, 'readonly').objectStore(store).getAll();
+            req.onsuccess = () => res(req.result);
+            req.onerror = () => rej(req.error);
+          });
+        } catch (e) { console.error("IDB GetAll Error:", e); return []; }
+      }
+    };
+
+    // ==========================================
+    // CORE APPLICATION LOGIC
+    // ==========================================
+    const app = {
+      init: async () => {
+        lucide.createIcons();
+        
+        // Handle onboarding form submit
+        $('onboarding-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const name = $('onboard-name').value;
+          const goal = Number($('onboard-goal').value);
+          const weight = Number($('onboard-weight').value) || 70;
+          const height = Number($('onboard-height').value) || 170;
+          const newProfile = {
+            id: 'me', name, weight, height, hasOnboarded: true, currentStreak: 0, longestStreak: 0, lastRunDate: null,
+            goals: { daily: Number((goal/5).toFixed(1)), weekly: goal, monthly: goal*4 },
+            records: { longestRunKm: 0, fastestPace: 0, totalKm: 0 },
+            settings: { voiceCoachInterval: 1, theme: 'light' }
+          };
+          await dbUtil.put('profile', newProfile);
+          state.profile = newProfile;
+          app.applyTheme();
+          app.navigate('home');
+        });
+
+        // Load Data
+        let profileData = await dbUtil.get('profile', 'me');
+        const runsData = await dbUtil.getAll('runs');
+        
+        state.runs = runsData.sort((a,b) => b.date - a.date);
+        
+        if (profileData && profileData.hasOnboarded) {
+          // Backward Compatibility Migration
+          if (profileData.weight === undefined) profileData.weight = 70;
+          if (profileData.height === undefined) profileData.height = 170;
+          if (!profileData.settings) profileData.settings = { theme: 'light', voiceCoachInterval: 1 };
+          if (profileData.settings.voiceCoach === true) profileData.settings.voiceCoachInterval = 1;
+          else if (profileData.settings.voiceCoach === false) profileData.settings.voiceCoachInterval = 0;
+          if (profileData.settings.voiceCoachInterval === undefined) profileData.settings.voiceCoachInterval = 1;
+          if (!profileData.goals) profileData.goals = { daily: 5, weekly: profileData.weeklyGoalKm || 20, monthly: 100 };
+          
+          state.profile = profileData;
+          app.applyTheme();
+          app.navigate('home');
+        } else {
+          app.navigate('onboarding');
+        }
+      },
+
+      applyTheme: () => {
+        const theme = state.profile?.settings?.theme || 'light';
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      },
+
+      navigate: (screen, data = null) => {
+        state.currentScreen = screen;
+        
+        // Hide all screens
+        document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+        // Show target screen
+        $(`screen-${screen}`).classList.add('active');
+        
+        // Bottom Nav logic
+        const navVisible = ['home', 'history', 'analytics', 'profile'].includes(screen);
+        $('bottom-nav').style.display = navVisible ? 'block' : 'none';
+        
+        if (navVisible) {
+          document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.remove('text-blue-600', 'dark:text-blue-500', 'scale-105');
+            btn.classList.add('text-gray-400');
+            btn.querySelector('svg').setAttribute('stroke-width', '2');
+          });
+          const activeBtn = $(`nav-${screen}`);
+          activeBtn.classList.remove('text-gray-400');
+          activeBtn.classList.add('text-blue-600', 'dark:text-blue-500', 'scale-105');
+          activeBtn.querySelector('svg').setAttribute('stroke-width', '2.5');
+        }
+
+        // Trigger Screen renders
+        if (screen === 'home') app.renderHome();
+        if (screen === 'history') app.renderHistory();
+        if (screen === 'analytics') app.renderAnalytics();
+        if (screen === 'profile') app.renderProfile();
+        if (screen === 'run-details' && data) app.renderRunDetails(data);
+        
+        lucide.createIcons();
+      },
+
+      // --- WAKE LOCK ---
+      requestWakeLock: async () => {
+        if ('wakeLock' in navigator) {
+          try { state.wakeLock = await navigator.wakeLock.request('screen'); } 
+          catch (err) { console.log('Wake Lock denied:', err); }
+        }
+      },
+      releaseWakeLock: async () => {
+        if (state.wakeLock !== null) {
+          await state.wakeLock.release();
+          state.wakeLock = null;
+        }
+      },
+
+      // --- RENDERING ---
+      renderHome: () => {
+        $('home-greeting').innerText = `Let's grind, ${state.profile.name}`;
+        $('streak-count').innerText = state.profile.currentStreak;
+        
+        const now = new Date();
+        const startOfDay = new Date(now).setHours(0,0,0,0);
+        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).setHours(0,0,0,0);
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).setHours(0,0,0,0);
+
+        const dailyKm = state.runs.filter(r => r.date >= startOfDay).reduce((s, r) => s + r.distance, 0);
+        const weeklyKm = state.runs.filter(r => r.date >= startOfWeek).reduce((s, r) => s + r.distance, 0);
+        const monthlyKm = state.runs.filter(r => r.date >= startOfMonth).reduce((s, r) => s + r.distance, 0);
+
+        const buildBar = (lbl, cur, max, color) => `
+          <div class="mb-4">
+            <div class="flex justify-between text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">
+              <span>${lbl}</span><span>${cur.toFixed(1)} / ${max} km</span>
+            </div>
+            <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+              <div class="h-2.5 rounded-full ${color} transition-all duration-1000" style="width: ${Math.min((cur/max)*100, 100)}%"></div>
+            </div>
+          </div>
+        `;
+        
+        $('home-goals-container').innerHTML = 
+          buildBar('Daily', dailyKm, state.profile.goals.daily, 'bg-green-500') +
+          buildBar('Weekly', weeklyKm, state.profile.goals.weekly, 'bg-blue-600') +
+          buildBar('Monthly', monthlyKm, state.profile.goals.monthly, 'bg-purple-500');
+
+        // Last Run Card Logic
+        const lastRunCard = $('last-run-card');
+        if (state.runs.length > 0) {
+          const lastRun = state.runs[0];
+          const lastDate = new Date(lastRun.date);
+          
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const runDay = new Date(lastRun.date);
+          runDay.setHours(0, 0, 0, 0);
+          const diffDays = Math.round((today - runDay) / (1000 * 60 * 60 * 24));
+          
+          let relDate = "";
+          if (diffDays === 0) relDate = "Today";
+          else if (diffDays === 1) relDate = "Yesterday";
+          else relDate = lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          
+          $('last-run-dist').innerText = lastRun.distance.toFixed(2);
+          $('last-run-duration').innerText = formatTime(lastRun.duration);
+          $('last-run-date').innerText = relDate;
+          
+          lastRunCard.classList.remove('hidden');
+          lastRunCard.classList.add('block');
+        } else {
+          lastRunCard.classList.remove('block');
+          lastRunCard.classList.add('hidden');
+        }
+      },
+
+      renderHistory: () => {
+        if (state.runs.length === 0) {
+          $('history-list').innerHTML = `
+            <div class="text-center py-20 px-6">
+              <i data-lucide="clock" class="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4"></i>
+              <h3 class="text-lg font-bold text-gray-700 dark:text-gray-300 mb-2">Blank Slate</h3>
+              <p class="text-gray-500 text-sm">Every pro was once a beginner. Start your first run!</p>
+            </div>
+          `;
+          return;
+        }
+        
+        const feelIcons = { easy: '😀', normal: '😐', hard: '😫' };
+
+        $('history-list').innerHTML = state.runs.map(run => `
+          <div onclick="app.navigate('run-details', ${run.id || run.date})" class="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col gap-3 cursor-pointer active:scale-[0.98] transition-transform">
+            <div class="flex justify-between items-start border-b border-gray-50 dark:border-gray-700 pb-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <i data-lucide="activity" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <p class="font-bold text-lg">${run.distance.toFixed(2)} km</p>
+                  <p class="text-xs text-gray-500 font-medium">${new Date(run.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="font-bold">${formatTime(run.duration)}</p>
+                <p class="text-xs text-gray-500">${formatPace(run.pace)} /km</p>
+              </div>
+            </div>
+            <div class="flex justify-between text-xs text-gray-400 px-1 items-center">
+              <span class="flex items-center gap-1"><i data-lucide="flame" class="w-3 h-3"></i> ${run.calories} kcal</span>
+              <div class="flex items-center gap-2">
+                ${run.feeling ? `<span class="text-sm" title="${run.feeling}">${feelIcons[run.feeling]}</span>` : ''}
+                <span>${run.route?.length > 0 ? 'Map Logged' : 'No GPS'}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      },
+
+      renderAnalytics: () => {
+        // 7-Day Trend
+        const last7Days = Array.from({length: 7}, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0,0,0,0); return d.getTime();
+        }).reverse();
+
+        const weeklyData = last7Days.map(date => {
+          const dayRuns = state.runs.filter(r => new Date(r.date).setHours(0,0,0,0) === date);
+          return { label: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }), km: dayRuns.reduce((s, r) => s + r.distance, 0) };
+        });
+        const maxKm = Math.max(...weeklyData.map(d => d.km), 1);
+
+        $('chart-7day').innerHTML = weeklyData.map(day => `
+          <div class="flex flex-col items-center flex-1">
+            <div class="w-full relative flex items-end justify-center h-32 bg-gray-50 dark:bg-gray-700 rounded-t-md">
+              <div class="w-full bg-blue-500 rounded-t-md transition-all duration-1000" style="height: ${(day.km/maxKm)*100}%; min-height: ${day.km>0?'10%':'0%'}"></div>
+            </div>
+            <span class="text-[10px] text-gray-500 font-bold mt-2 uppercase">${day.label}</span>
+            <span class="text-xs font-black">${day.km>0 ? day.km.toFixed(1) : ''}</span>
+          </div>
+        `).join('');
+
+        // Pace Trend
+        const recentRuns = [...state.runs].filter(r => r.distance >= 0.5).slice(0, 5).reverse();
+        if(recentRuns.length < 2) {
+          $('chart-pace').innerHTML = `<p class="text-sm text-gray-500 py-4 text-center">Complete at least 2 runs (>500m) to see pace trends.</p>`;
+        } else {
+          $('chart-pace').innerHTML = recentRuns.map(r => `
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-medium text-gray-500">${new Date(r.date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
+              <div class="flex-1 mx-4 bg-gray-100 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden flex items-center">
+                 <div class="bg-green-500 h-full rounded-full" style="width: ${Math.max(10, 100 - (r.pace / 600)*100)}%"></div>
+              </div>
+              <span class="text-sm font-bold w-12 text-right">${formatPace(r.pace)}</span>
+            </div>
+          `).join('');
+        }
+      },
+
+      renderProfile: () => {
+        $('prof-totalkm').innerText = state.profile.records.totalKm.toFixed(1);
+        $('prof-streak').innerText = state.profile.longestStreak;
+        $('prof-pr-dist').innerText = `${state.profile.records.longestRunKm.toFixed(2)} km`;
+        $('prof-pr-pace').innerText = state.profile.records.fastestPace ? `${formatPace(state.profile.records.fastestPace)} /km` : '--:--';
+        $('prof-totalruns').innerText = state.runs.length;
+        
+        $('prof-input-goal').value = state.profile.goals.weekly;
+        $('prof-input-weight').value = state.profile.weight || 70;
+        $('prof-input-height').value = state.profile.height || 170;
+        $('prof-input-voice').value = state.profile.settings.voiceCoachInterval.toString();
+
+        const tm = state.profile.settings.theme === 'dark';
+        $('toggle-theme').className = `w-12 h-6 rounded-full relative transition-colors ${tm ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`;
+        $('toggle-theme-dot').className = `w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${tm ? 'translate-x-6' : 'translate-x-0.5'}`;
+      },
+
+      toggleTheme: () => {
+        state.profile.settings.theme = state.profile.settings.theme === 'dark' ? 'light' : 'dark';
+        app.applyTheme();
+        app.renderProfile();
+      },
+
+      saveProfileSettings: async () => {
+        const wg = Number($('prof-input-goal').value);
+        state.profile.weight = Number($('prof-input-weight').value) || 70;
+        state.profile.height = Number($('prof-input-height').value) || 170;
+        state.profile.settings.voiceCoachInterval = Number($('prof-input-voice').value);
+        state.profile.goals = { daily: Number((wg/5).toFixed(1)), weekly: wg, monthly: wg*4 };
+        await dbUtil.put('profile', state.profile);
+        alert("Settings saved successfully!");
+      },
+
+      // --- RUN TRACKING LOGIC ---
+      startRun: async (isSim) => {
+        if (!isSim && navigator.permissions) {
+          try {
+            const status = await navigator.permissions.query({ name: 'geolocation' });
+            if (status.state === 'denied') {
+              alert("Location access is denied. Please enable it in your browser settings to track real runs.");
+              return;
+            }
+          } catch(e) {} // Fallback gracefully if permissions API isn't supported
+        }
+
+        app.requestWakeLock();
+        app.navigate('run');
+        
+        // Reset full state explicitly
+        state.runData = {
+          isSimulated: isSim, status: 'acquiring', sec: 0, dist: 0, route: [],
+          intervalId: null, watchId: null, lastValidPoint: null,
+          lastAnnouncedDist: 0, goalAnnounced: false
+        };
+        const rd = state.runData;
+        
+        $('run-error-container').classList.add('hidden');
+        $('gps-indicator').innerText = '';
+        $('run-status-badge').innerHTML = `<i data-lucide="activity" class="animate-pulse w-3 h-3"></i> ACQUIRING GPS`;
+        app.renderRunUI();
+        
+        if (isSim) {
+          app.setRunState('running');
+          $('gps-indicator').innerHTML = '<span class="text-blue-500">SIMULATOR ACTIVE</span>';
+          rd.watchId = setInterval(() => { if(rd.status==='running') app.updateRunTick(null, true); }, 1000);
+        } else {
+          if (!navigator.geolocation) {
+            app.showRunError("Geolocation not supported by this browser.", true);
+            return;
+          }
+          rd.watchId = navigator.geolocation.watchPosition((pos) => {
+            const acc = pos.coords.accuracy;
+            
+            // GPS Accuracy Indicator
+            let ind = '🔴 Weak'; let col = 'text-red-500';
+            if (acc <= 10) { ind = '🟢 Strong'; col = 'text-green-500'; }
+            else if (acc <= 30) { ind = '🟡 Medium'; col = 'text-yellow-500'; }
+            $('gps-indicator').innerHTML = `<span class="${col}">${ind} (${Math.round(acc)}m)</span>`;
+            
+            if (acc > 30) {
+               if(rd.status === 'acquiring') $('run-error-msg').innerText = "Waiting for stronger GPS signal (current accuracy: >30m)...";
+               $('run-error-container').classList.remove('hidden');
+               return; // Ignore highly inaccurate points
+            } else {
+               $('run-error-container').classList.add('hidden');
+            }
+
+            if (rd.status === 'acquiring') app.setRunState('running');
+            app.updateRunTick(pos, false);
+          }, (err) => {
+            if (err.code === err.PERMISSION_DENIED) app.showRunError("Location access denied. Please enable location permissions.", true);
+            else if (rd.route.length === 0) app.showRunError("Waiting for GPS signal...", false);
+          }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+        }
+      },
+
+      setRunState: (newStatus) => {
+        const rd = state.runData;
+        rd.status = newStatus;
+        
+        // Handle Timer Interval
+        if (newStatus === 'running') {
+          if (!rd.intervalId) rd.intervalId = setInterval(() => { rd.sec++; app.renderRunUI(); }, 1000);
+          speak(rd.sec === 0 ? "Run started. Let's go." : "Resuming run.");
+          $('run-status-badge').innerHTML = rd.isSimulated ? 'SIMULATOR ACTIVE' : 'GPS LIVE';
+        } else if (newStatus === 'paused') {
+          if (rd.intervalId) { clearInterval(rd.intervalId); rd.intervalId = null; }
+          speak("Run paused.");
+        }
+        app.renderRunUI();
+      },
+
+      updateRunTick: (pos, isSim) => {
+        const rd = state.runData;
+        if (rd.status !== 'running') return;
+
+        if (isSim) {
+          rd.dist += 0.0035; // Fast sim
+        } else {
+          const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude, ts: pos.timestamp };
+          
+          if (rd.lastValidPoint) {
+             const inc = calcDist(rd.lastValidPoint.lat, rd.lastValidPoint.lng, pt.lat, pt.lng);
+             const timeDiff = (pt.ts - rd.lastValidPoint.ts) / 1000; // seconds
+             const speed = timeDiff > 0 ? inc / (timeDiff / 3600) : 0; // km/h
+             
+             // Lightweight Filter: Ignore micro-noise (<5 meters) and impossible speed (>25km/h for average run)
+             if (inc > 0.005 && speed < 25) {
+                rd.dist += inc;
+                rd.route.push({lat: pt.lat, lng: pt.lng}); // Clean point
+                rd.lastValidPoint = pt;
+             }
+          } else {
+             rd.route.push({lat: pt.lat, lng: pt.lng});
+             rd.lastValidPoint = pt;
+          }
+        }
+
+        // Continuous Voice Milestones
+        const interval = state.profile.settings.voiceCoachInterval;
+        if (interval > 0) {
+            const nextMilestone = (Math.floor(rd.lastAnnouncedDist / interval) + 1) * interval;
+            // E.g. if interval is 0.5, nextMilestone = 0.5. When dist hits 0.5, announce, set lastAnnounced to 0.5. Next is 1.0.
+            if (rd.dist >= nextMilestone) {
+                rd.lastAnnouncedDist = nextMilestone;
+                const p = formatPaceSpeech(rd.dist > 0 ? (rd.sec / rd.dist) : 0);
+                const cals = Math.round(rd.dist * (state.profile.weight || 70) * 1.036);
+                let msg = `You have completed ${nextMilestone >= 1 ? nextMilestone : nextMilestone * 1000} ${nextMilestone >= 1 ? 'kilometers' : 'meters'}. `;
+                if (p) msg += `Current pace is ${p} per kilometer. `;
+                msg += `Calories burned, ${cals}.`;
+
+                const remaining = state.profile.goals.daily - rd.dist;
+                if (remaining > 0 && remaining <= 1) msg += ` Only ${remaining.toFixed(1)} kilometers remaining to reach today's goal.`;
+                speak(msg);
+            }
+        }
+
+        if (rd.dist >= state.profile.goals.daily && !rd.goalAnnounced && state.profile.goals.daily > 0) {
+          speak("Daily goal completed. Great discipline!"); rd.goalAnnounced = true;
+        }
+
+        app.renderRunUI();
+      },
+
+      renderRunUI: () => {
+        const rd = state.runData;
+        $('run-dist').innerText = rd.dist.toFixed(2);
+        $('run-time').innerText = formatTime(rd.sec);
+        $('run-pace').innerText = formatPace(rd.dist > 0 ? (rd.sec / rd.dist) : 0);
+
+        const ctrl = $('run-controls');
+        if (rd.status === 'acquiring') {
+          ctrl.innerHTML = `<div class="text-gray-500 animate-pulse text-sm font-medium">Waiting for signal...</div>`;
+        } else if (rd.status === 'paused') {
+          ctrl.innerHTML = `
+            <button onclick="app.setRunState('running')" class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-95"><i data-lucide="play" class="w-8 h-8 fill-current ml-1 text-white"></i></button>
+            <button onclick="app.finishRun()" class="w-20 h-20 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg active:scale-95"><i data-lucide="square" class="w-7 h-7 fill-current"></i></button>
+          `;
+        } else {
+          ctrl.innerHTML = `
+            <button onclick="app.setRunState('paused')" class="w-24 h-24 bg-yellow-500 text-yellow-950 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(234,179,8,0.3)] active:scale-95"><i data-lucide="pause" class="w-10 h-10 fill-current"></i></button>
+          `;
+        }
+        lucide.createIcons();
+      },
+
+      showRunError: (msg, showCancelAction = false) => {
+        $('run-error-container').classList.remove('hidden');
+        $('run-error-msg').innerText = msg;
+        const btn = $('run-error-action');
+        if(showCancelAction) {
+           btn.classList.remove('hidden');
+           btn.innerText = "Go Back";
+           btn.onclick = app.cancelRun;
+        } else { btn.classList.add('hidden'); }
+      },
+
+      cancelRun: () => {
+        const rd = state.runData;
+        if(rd.intervalId) clearInterval(rd.intervalId);
+        if(rd.watchId) {
+            if (rd.isSimulated) clearInterval(rd.watchId);
+            else if (navigator.geolocation) navigator.geolocation.clearWatch(rd.watchId);
+        }
+        app.releaseWakeLock();
+        app.navigate('home');
+      },
+
+      finishRun: () => {
+        const rd = state.runData;
+        if(rd.intervalId) clearInterval(rd.intervalId);
+        if(rd.watchId) {
+            if (rd.isSimulated) clearInterval(rd.watchId);
+            else if (navigator.geolocation) navigator.geolocation.clearWatch(rd.watchId);
+        }
+        app.releaseWakeLock();
+        
+        if (rd.dist < 0.01 && rd.sec < 10) { app.navigate('home'); return; } // Too short
+        
+        speak(`Run complete. Total distance: ${rd.dist.toFixed(2)} kilometers.`);
+        
+        const pace = rd.dist > 0 ? (rd.sec / rd.dist) : 0;
+        const weight = state.profile.weight || 70;
+        
+        state.tempRun = {
+          id: Date.now(), // Unique ID for DB
+          date: Date.now(), duration: rd.sec, distance: Number(rd.dist.toFixed(2)), 
+          pace, calories: Math.round(rd.dist * weight * 1.036), 
+          // Personalized stride length based on height
+          steps: Math.round((rd.dist * 1000) / ((state.profile.height || 170) * 0.00415)), 
+          route: rd.route, status: 'completed', feeling: 'normal'
+        };
+
+        // Render Summary
+        $('summary-date').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        $('summary-dist').innerText = state.tempRun.distance.toFixed(2);
+        $('summary-time').innerText = formatTime(state.tempRun.duration);
+        $('summary-pace').innerText = `${formatPace(state.tempRun.pace)} /km`;
+        $('summary-cal').innerText = state.tempRun.calories;
+        $('summary-steps').innerText = state.tempRun.steps;
+        
+        // Reset Feeling Buttons
+        app.setFeeling('normal');
+
+        app.navigate('run-summary');
+        app.renderLeafletMap(state.tempRun.route, 'map-container', 'summary');
+      },
+
+      setFeeling: (feel) => {
+        if(state.tempRun) state.tempRun.feeling = feel;
+        ['easy', 'normal', 'hard'].forEach(f => {
+           $(`feel-${f}`).classList.remove('selected');
+        });
+        $(`feel-${feel}`).classList.add('selected');
+      },
+
+      saveCompletedRun: async () => {
+        if(!state.tempRun) return;
+        
+        await dbUtil.put('runs', state.tempRun);
+        state.runs.unshift(state.tempRun); 
+        
+        // Update Profile Stats
+        const today = new Date().setHours(0,0,0,0);
+        const lastRunDay = state.profile.lastRunDate ? new Date(state.profile.lastRunDate).setHours(0,0,0,0) : null;
+        
+        let { currentStreak, longestStreak, records } = state.profile;
+        if (lastRunDay === today - 86400000) currentStreak += 1;
+        else if (lastRunDay !== today) currentStreak = 1;
+        if (currentStreak > longestStreak) longestStreak = currentStreak;
+
+        const isNewDistPR = state.tempRun.distance > records.longestRunKm;
+        const isNewPacePR = (state.tempRun.pace < records.fastestPace || records.fastestPace === 0) && state.tempRun.distance >= 1;
+
+        state.profile.currentStreak = currentStreak;
+        state.profile.longestStreak = longestStreak;
+        state.profile.lastRunDate = Date.now();
+        state.profile.records.totalKm = Number((records.totalKm + state.tempRun.distance).toFixed(2));
+        if (isNewDistPR) state.profile.records.longestRunKm = state.tempRun.distance;
+        if (isNewPacePR) state.profile.records.fastestPace = state.tempRun.pace;
+
+        await dbUtil.put('profile', state.profile);
+        
+        state.tempRun = null;
+        app.navigate('history');
+      },
+
+      renderRunDetails: (id) => {
+         const run = state.runs.find(r => r.id === id || r.date === id);
+         if(!run) return;
+         
+         const feelLabels = { easy: '😀 Easy', normal: '😐 Normal', hard: '😫 Hard' };
+
+         $('details-date').innerText = new Date(run.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+         $('details-dist').innerText = run.distance.toFixed(2);
+         $('details-time').innerText = formatTime(run.duration);
+         $('details-pace').innerText = `${formatPace(run.pace)} /km`;
+         $('details-cal').innerText = run.calories;
+         $('details-steps').innerText = run.steps || 0;
+         $('details-feeling').innerText = run.feeling ? feelLabels[run.feeling] : 'Not Recorded';
+
+         app.renderLeafletMap(run.route, 'details-map-container', 'details');
+      },
+
+      renderLeafletMap: (route, containerId, mapInstanceKey) => {
+        if (!navigator.onLine || !window.L) {
+           $(containerId).innerHTML = `<div class="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-800"><i data-lucide="wifi-off" class="mb-2"></i><span>Map unavailable offline</span></div>`;
+           lucide.createIcons();
+           return;
+        }
+
+        if (!route || route.length === 0) {
+           $(containerId).innerHTML = `<div class="w-full h-full flex items-center justify-center text-gray-400"><i data-lucide="map-pin" class="mr-2"></i> No route data</div>`;
+           lucide.createIcons();
+           return;
+        }
+
+        $(containerId).innerHTML = ''; // Clear fallback UI
+
+        if (state.leafletMaps[mapInstanceKey]) { 
+           state.leafletMaps[mapInstanceKey].remove(); 
+        }
+        
+        const map = L.map(containerId, { zoomControl: false, attributionControl: false });
+        state.leafletMaps[mapInstanceKey] = map;
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        const latlngs = route.map(p => [p.lat, p.lng]);
+        const polyline = L.polyline(latlngs, { color: '#2563eb', weight: 4, opacity: 0.8 }).addTo(map);
+        
+        L.circleMarker(latlngs[0], { radius: 6, fillColor: '#22c55e', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+        L.circleMarker(latlngs[latlngs.length - 1], { radius: 6, fillColor: '#ef4444', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+
+        map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+      },
+
+      // --- DATA MANAGEMENT ---
+      exportData: () => {
+        const exportObj = {
+          profile: state.profile,
+          runs: state.runs
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        const d = new Date();
+        const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+        downloadAnchorNode.setAttribute("download", `runtrack-export-${dateStr}.json`);
+        document.body.appendChild(downloadAnchorNode); 
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+      },
+
+      resetAllData: async () => {
+        const confirmMsg = "This will permanently delete:\n\n• Profile\n• All Runs\n• Goals\n• Records\n• Settings\n\nThis action cannot be undone.";
+        if (confirm(confirmMsg)) {
+          try {
+            const db = await dbUtil.init();
+            await new Promise((res, rej) => {
+              const req = db.transaction('profile', 'readwrite').objectStore('profile').clear();
+              req.onsuccess = res; req.onerror = rej;
+            });
+            await new Promise((res, rej) => {
+              const req = db.transaction('runs', 'readwrite').objectStore('runs').clear();
+              req.onsuccess = res; req.onerror = rej;
+            });
+            state.profile = null;
+            state.runs = [];
+            app.navigate('onboarding');
+          } catch (e) {
+            alert("Error resetting data: " + e.message);
+          }
+        }
+      }
+    };
+
+    // Initialize App
+    document.addEventListener('DOMContentLoaded', app.init);
+  </script>
+</body>
+</html>
