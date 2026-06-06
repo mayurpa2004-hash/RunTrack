@@ -1,3 +1,6 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
@@ -40,6 +43,23 @@
   </style>
 </head>
 <body class="bg-gray-200 dark:bg-black flex justify-center font-sans selection:bg-blue-200 selection:text-blue-900 transition-colors duration-300">
+
+  <!-- PWA Install Banner -->
+  <div id="pwa-install-banner" style="display:none" class="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between gap-3 bg-blue-600 text-white px-4 py-3 shadow-lg max-w-md mx-auto">
+    <div class="flex items-center gap-3 flex-1 min-w-0">
+      <img src="./icons/icon-192.png" alt="RunTrack" class="w-9 h-9 rounded-xl flex-shrink-0">
+      <div class="min-w-0">
+        <p class="font-bold text-sm leading-tight">Install RunTrack</p>
+        <p class="text-blue-200 text-xs leading-tight truncate">Add to Home Screen for offline use</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <button id="pwa-install-btn" class="bg-white text-blue-600 font-bold text-xs px-3 py-1.5 rounded-lg active:scale-95 transition-transform">Install</button>
+      <button id="pwa-install-dismiss" class="text-blue-200 hover:text-white p-1" aria-label="Dismiss">✕</button>
+    </div>
+  </div>
+
+
   
   <!-- Mobile App Container -->
   <div class="w-full max-w-md h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white flex flex-col shadow-2xl overflow-hidden relative transition-colors duration-300">
@@ -341,6 +361,12 @@
           <i data-lucide="trash-2" class="w-5 h-5"></i> Reset All Data
         </button>
 
+        <button id="pwa-profile-install-btn" onclick="app.triggerInstall()" class="hidden w-full py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 rounded-xl font-bold flex justify-center items-center gap-2 mt-2 active:scale-95 transition-transform shadow-sm mb-2">
+          <i data-lucide="download" class="w-5 h-5"></i> Install App on Device
+        </button>
+
+
+
       </div>
 
     </main>
@@ -371,9 +397,72 @@
     // ==========================================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration Failed:', err));
+        navigator.serviceWorker.register('./sw.js', { scope: './' })
+          .then(reg => console.log('SW Registered, scope:', reg.scope))
+          .catch(err => console.log('SW Registration Failed:', err));
       });
     }
+
+    // ==========================================
+    // PWA INSTALL PROMPT
+    // ==========================================
+    let _deferredInstallPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later
+      _deferredInstallPrompt = e;
+      console.log('beforeinstallprompt captured — showing install UI');
+      // Show our custom install banner
+      showInstallUI();
+    });
+
+    window.addEventListener('appinstalled', () => {
+      console.log('PWA was installed');
+      _deferredInstallPrompt = null;
+      hideInstallUI();
+    });
+
+    function showInstallUI() {
+      const banner = document.getElementById('pwa-install-banner');
+      const profileBtn = document.getElementById('pwa-profile-install-btn');
+      if (banner) banner.style.display = 'flex';
+      if (profileBtn) profileBtn.classList.remove('hidden');
+    }
+
+    function hideInstallUI() {
+      const banner = document.getElementById('pwa-install-banner');
+      const profileBtn = document.getElementById('pwa-profile-install-btn');
+      if (banner) banner.style.display = 'none';
+      if (profileBtn) profileBtn.classList.add('hidden');
+    }
+
+    async function triggerInstallPrompt() {
+      if (!_deferredInstallPrompt) {
+        console.warn('No install prompt available');
+        return;
+      }
+      _deferredInstallPrompt.prompt();
+      const { outcome } = await _deferredInstallPrompt.userChoice;
+      console.log('User response to install prompt:', outcome);
+      _deferredInstallPrompt = null;
+      if (outcome === 'accepted') hideInstallUI();
+    }
+
+    // Wire up banner buttons
+    document.addEventListener('DOMContentLoaded', () => {
+      const installBtn = document.getElementById('pwa-install-btn');
+      const dismissBtn = document.getElementById('pwa-install-dismiss');
+      if (installBtn) installBtn.addEventListener('click', triggerInstallPrompt);
+      if (dismissBtn) dismissBtn.addEventListener('click', () => {
+        hideInstallUI();
+        // Remember dismissal for this session only
+        sessionStorage.setItem('pwa-banner-dismissed', '1');
+      });
+      // Don't show if already dismissed this session
+      if (sessionStorage.getItem('pwa-banner-dismissed')) hideInstallUI();
+    });
 
     // ==========================================
     // GLOBAL STATE & UTILS
@@ -1064,6 +1153,10 @@
       },
 
       // --- DATA MANAGEMENT ---
+      triggerInstall: () => {
+        triggerInstallPrompt();
+      },
+
       exportData: () => {
         const exportObj = {
           profile: state.profile,
